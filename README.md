@@ -9,5 +9,5 @@ https://www.sciencedirect.com/science/article/abs/pii/S0167865519302235
 ![](figures/RESIDE_Samples_6.png)
 
 ## Demo:
-!(data/girls.jpg)
-!(output/girls.jpg)
+![](data/girls.jpg)
+![](output/girls.jpg)
