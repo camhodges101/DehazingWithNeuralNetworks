@@ -5,8 +5,8 @@ This is the final trained model used for dehazing images in our paper published 
 https://www.sciencedirect.com/science/article/abs/pii/S0167865519302235
 
 ## Demo:
-!(figures/selfDrivingExamples_1.png)
-!(figures/RESIDE_Samples_6.png)
+![](figures/selfDrivingExamples_1.png)
+![](figures/RESIDE_Samples_6.png)
 
 ## Demo:
 !(data/girls.jpg)
