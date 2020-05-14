@@ -6,7 +6,7 @@ https://www.sciencedirect.com/science/article/abs/pii/S0167865519302235
 
 
 ```python
-Run demo on images in /data directory
+#Run demo on images in /data directory
 python finalTesting_onestep_upscale.py
 ```
 
