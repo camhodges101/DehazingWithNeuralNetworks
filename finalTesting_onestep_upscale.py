@@ -23,32 +23,12 @@ from skimage.measure import compare_ssim as ssim
 
 from skimage.transform import resize
 
-#%%
-
-def rgb2gray(rgb):
-
-    r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
-    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
-
-    return gray  
-#Input directories
-
-#%%
-
-#%%
-
 cutOff=float(0.05)
-
-gf_ind="y"
-
-
-
-#%%
 
 def loadSourceList(file_path):
     listing = os.listdir(file_path)
     num_samples=np.size(listing)
-    #print (num_samples)
+    
     imCompath=[]
     for file in range(num_samples):
         imCompath+=[file_path+listing[file]]
@@ -113,7 +93,7 @@ def generator_neural_network(x,train_batch_size):
     def core_network(x):
         with tf.name_scope('G_core_network'):
 
-            #conv1a=conv1
+            
             x=tf.subtract(x,tf.constant(0.5))
             conv1=conv2d(x,G_weights['G_W_conv1'],(5,5),'L_G_conv1')
             
@@ -135,19 +115,11 @@ def generator_neural_network(x,train_batch_size):
             conv4a=tf.minimum(tf.maximum(conv4,tf.constant(0,'float')),tf.constant(1,'float'))
             fc = tf.reshape(conv4a ,[-1,1*48])
             output=tf.matmul(fc, G_weights['G_out'])+G_biases['G_out']
-            #output=tf.minimum(tf.maximum(output,tf.constant(0,'float')),tf.constant(1,'float'))
+            
             
             
             return output
     
-    def t_negCorrection(dehzed,rgb):
-        pvc_1_chmin=tf.reduce_min((dehzed),axis=3)
-        pvc_1_chmax=tf.reduce_max((dehzed),axis=3)
-        
-        inRangecondition=tf.reshape(tf.logical_and(tf.greater(pvc_1_chmin,tf.constant(-1e-5,'float')),tf.less(pvc_1_chmax,tf.constant(1.00000001,'float'))),[1,620,940,1])
-        inRangecondition=tf.concat((inRangecondition,inRangecondition,inRangecondition),axis=3)
-        correctedImage=tf.where(inRangecondition,dehzed,rgb)
-        return correctedImage
           
       
     def reconstruct_image(patches,num_ch):
@@ -161,13 +133,13 @@ def generator_neural_network(x,train_batch_size):
         w_ratio = 47
          
         image = tf.reshape(patches, [1, h_ratio, w_ratio, p_area, patch_ch])
-        #print(image)
+        
         image = tf.split(image, p_area, 3)
         
         image = tf.stack(image, 0)
-        #print(image)
+        
         image = tf.reshape(image, [p_area, h_ratio, w_ratio, patch_ch])
-        #print(image)
+        
         image = tf.batch_to_space_nd(image, [patch_h, patch_w], pad)
         return image
      
@@ -177,7 +149,7 @@ def generator_neural_network(x,train_batch_size):
             txL+=[tf.fill([20,20],transmap[0,k])]
         txL=tf.stack(txL,axis=0)
         txF=reconstruct_image(txL,1)
-        #txF=smoothFilter(txF)
+        
         return txF     
       
     def generate_patches(image):
@@ -188,12 +160,11 @@ def generator_neural_network(x,train_batch_size):
         image_ch = 3
         p_area = patch_h * patch_w
         patches = tf.space_to_batch_nd([image[0]], [patch_h, patch_w], pad)
-        #print(patches.shape)
         
         patches = tf.split(patches, p_area, 0)
         
         patches = tf.stack(patches, 3)
-        #print(patches)
+        
         patches = tf.reshape(patches, [-1, patch_h, patch_w, image_ch])
         return patches
      
@@ -203,23 +174,19 @@ def generator_neural_network(x,train_batch_size):
         input_im=tf.reshape(input_im,[1,620,940,3])
         
         airlight=tf.reshape(find_atmo_light(input_im),[1,620,940,3])
-        #observed=transmap*true+airlight(1-trans)
-        #true=(observed-airlight(1-trans))/trans
+
         filter_im=tf.subtract(tf.constant(1.0),tf.reshape(tf.image.rgb_to_grayscale(input_im),[620,940]))
-        #filter_im=tf.reshape(tf.image.rgb_to_grayscale(input_im),[380,620])
-        if gf_ind=="y":
-            transMap=tf.reshape(reformTransmap(trans_map),[620,940])
-            transMap=tf.reshape(t_guidedFilter(filter_im,transMap,40,1e-5),[1,620,940,1])
-            #transMap=guided_filter(transMap, filter_im, 70, 1e-5)
-        if gf_ind=="n":
-            transMap=tf.reshape(reformTransmap(trans_map),[1,620,940,1])
+
+        transMap=tf.reshape(reformTransmap(trans_map),[620,940])
+        transMap=tf.reshape(t_guidedFilter(filter_im,transMap,40,1e-5),[1,620,940,1])
+
 
         
-        #transMap=tf.reshape(tf.subtract(tf.constant(1.0),t_guidedFilter(transMap, filter_im,40,1e-5)),[1,380,620,1])
+
         transMap=tf.concat((transMap,transMap,transMap),axis=3)
         transMap=tf.reshape(tf.maximum(tf.reshape(transMap,[-1]),tf.constant(cutOff)),[-1,620,940,3])#Best if 0.6 with neg correction
         final_image=tf.add(tf.divide(tf.subtract(input_im,airlight),transMap),airlight)
-        #final_image=t_negCorrection(final_image,input_im)
+
 
         return final_image  
         
@@ -234,19 +201,15 @@ def generator_neural_network(x,train_batch_size):
                 print(l+1)
                 
             return output_batch
-    #with tf.name_scope('input_image'):
-        #input_image=tf.placeholder('float',[None,380,620,3])
-    
-    
     
     with tf.name_scope('complete_network'):
         siamese_in=[]
         
-        #x_trans=tf.subtract(x,tf.constant(0.5))
+        
         for i in range(train_batch_size): 
             patches=tf.reshape(generate_patches(x[i:i+1]),[1457,20,20,3])
             output_dense=tf.reshape(core_network(patches),[-1,1457])
-            #output_dense_n=tf.maximum(output_dense,tf.constant(20.0,'float'))
+            
             siamese_in+=[dehaze_single(x[i:i+1], output_dense)]
             
             
@@ -254,21 +217,14 @@ def generator_neural_network(x,train_batch_size):
 
        
         return siamese_in
-#%%
+
 train_batch_size=1    
 with tf.name_scope(name):
     x1=tf.placeholder('float',[train_batch_size,620,940,3],name='x1')#Always clean Image
 
-    #y=tf.placeholder('float',[None],name='y')
+    
 with tf.name_scope("generator_network"):
     dehz=generator_neural_network(x1,train_batch_size)
-
-
-
-   
-#%%
-
-
 
 with tf.Session() as sess:
 
@@ -276,10 +232,6 @@ with tf.Session() as sess:
         
     
     save_path_G=saver_G.restore(sess, "G_ C_model_1_ecud_min.ckpt") 
-
-
-    
-
     
     for n in range(len(os.listdir("data"))):
         #n=1   
@@ -291,7 +243,6 @@ with tf.Session() as sess:
         pvc = resize(pvc, (originalsize[1], originalsize[0]), anti_aliasing=True)
         pvc=np.concatenate((np.expand_dims(pvc[...,2],-1),np.expand_dims(pvc[...,1],-1),np.expand_dims(pvc[...,0],-1)),axis=2)
         cv2.imwrite(str('output/'+hazy[n].split('/')[-1]), pvc * 255.0,[cv2.IMWRITE_JPEG_QUALITY, 100])
-        #    np.savetxt(fname="C:\\Users\\Cameron\\\Dropbox\\Masters Research\\Dehazing Code Base\\loss_reg\\finalPerformance-"+weightSelect+".csv",X=print_loss_reg,fmt='%s',delimiter=",")
         print('image - '+str(n+1)+' completed'+"Time: "+"%.2f" %  round(time.time()-ti,2))
         
     
