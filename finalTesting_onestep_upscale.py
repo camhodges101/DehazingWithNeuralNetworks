@@ -26,6 +26,7 @@ from skimage.transform import resize
 cutOff=float(0.05)
 
 def loadSourceList(file_path):
+'''Looks in source image directory and returns list of files'''
     listing = os.listdir(file_path)
     num_samples=np.size(listing)
     
@@ -35,6 +36,7 @@ def loadSourceList(file_path):
     return np.array(imCompath)
 
 def load_images(file_name):
+'''Loads images by filename into numpy array, resizes to standard 940 x 620'''
     if train_batch_size == 1:
         file_name=[file_name] 
     else: 
@@ -52,7 +54,7 @@ def load_images(file_name):
 hazy=os.listdir("data")
 
 
-#%%
+'''Resets graph on each run of script'''
 tf.reset_default_graph()
 #Start Generator Code
 name=None
@@ -64,6 +66,7 @@ def maxpool2d(x,wd,name):
     return tf.nn.max_pool(x,ksize=(1,wd[0],wd[1],1), strides=[1,wd[0],wd[1],1], padding='SAME',name=name)
 
 with tf.name_scope('G_weights'):
+'''Creates dictionary of weights for each model layer, these are randomly initialized, these values are overwritten later with checkpoint restore'''
     G_weights={'G_W_conv1':tf.Variable(tf.random_normal([5,5,3,16],mean=0, stddev=0.003)),
              'G_W_conv2a':tf.Variable(tf.random_normal([3,3,16,16],mean=0, stddev=0.003)),
              'G_W_conv2b':tf.Variable(tf.random_normal([5,5,16,16],mean=0, stddev=0.003)),
@@ -78,6 +81,7 @@ with tf.name_scope('G_weights'):
     tf.summary.histogram("G_weights_out", G_weights['G_out'])
             
 with tf.name_scope('G_biases'):    
+'''Biases, same as above re checkpoint'''
     G_biases={'G_W_conv1':tf.Variable(tf.zeros([16])),
              'G_W_conv2a':tf.Variable(tf.zeros([16])),
              'G_W_conv2b':tf.Variable(tf.zeros([16])),
@@ -91,6 +95,7 @@ def generator_neural_network(x,train_batch_size):
 
     
     def core_network(x):
+    '''This defines the core network, this predicts a transmission map for a 20x20 pixel patch'''
         with tf.name_scope('G_core_network'):
 
             
@@ -123,6 +128,7 @@ def generator_neural_network(x,train_batch_size):
           
       
     def reconstruct_image(patches,num_ch):
+    '''This takes 1457 20x20 pixel patches and reforms them into a single 920x620 pixel image'''
         image_h, image_w=620, 940
         pad = [[0, 0], [0, 0]]
         patch_h = 20
@@ -153,10 +159,10 @@ def generator_neural_network(x,train_batch_size):
         return txF     
       
     def generate_patches(image):
+    '''This takes the input image and brakes it down into a array of 20x20 pixel patches'''
         patch_h, patch_w = 20,20
         pad = [[0, 0], [0, 0]]
-        image_h = 620
-        image_w = 640
+
         image_ch = 3
         p_area = patch_h * patch_w
         patches = tf.space_to_batch_nd([image[0]], [patch_h, patch_w], pad)
@@ -170,7 +176,7 @@ def generator_neural_network(x,train_batch_size):
      
         
     def dehaze_single(input_im, trans_map):
-
+'''This is the full pipeline for dehazing a single image, input is a RGB image, outputs dehazed RGB image, both input and output are 940,620 sized'''
         input_im=tf.reshape(input_im,[1,620,940,3])
         
         airlight=tf.reshape(find_atmo_light(input_im),[1,620,940,3])
@@ -191,21 +197,21 @@ def generator_neural_network(x,train_batch_size):
         return final_image  
         
         
-    def dehaze_tensor(in_values):
-        with tf.name_scope('Dehaze_tensor'):
-            input_im, trans_map = in_values
-            batch_size=input_im.shape[0].value
-            output_batch=dehaze_single(input_im[0], trans_map[0])
-            for l in range(batch_size-1):
-                output_batch=tf.concat([output_batch,dehaze_single(input_im[l+1], trans_map[l+1])],axis=0)
-                print(l+1)
+    # def dehaze_tensor(in_values):
+        # with tf.name_scope('Dehaze_tensor'):
+            # input_im, trans_map = in_values
+            # batch_size=input_im.shape[0].value
+            # output_batch=dehaze_single(input_im[0], trans_map[0])
+            # for l in range(batch_size-1):
+                # output_batch=tf.concat([output_batch,dehaze_single(input_im[l+1], trans_map[l+1])],axis=0)
+                # print(l+1)
                 
-            return output_batch
+            # return output_batch
     
     with tf.name_scope('complete_network'):
         siamese_in=[]
         
-        
+        '''Runs the dehazing pipeline for each image in data directory'''
         for i in range(train_batch_size): 
             patches=tf.reshape(generate_patches(x[i:i+1]),[1457,20,20,3])
             output_dense=tf.reshape(core_network(patches),[-1,1457])
@@ -230,16 +236,20 @@ with tf.Session() as sess:
 
     sess.run(tf.initialize_all_variables())
         
-    
+    #Restores saved checkpoint of finetuned weights
     save_path_G=saver_G.restore(sess, "G_ C_model_1_ecud_min.ckpt") 
     
     for n in range(len(os.listdir("data"))):
         #n=1   
         ti=time.time()
+        #Load hazy image and resize
         originalsize, inputImage=load_images(hazy[n])
+        
+        #Single run of dehazing network for entire image
         pvc =sess.run(dehz, feed_dict={x1: inputImage})
         pvc=pvc.reshape((620,940,3))
         
+        #Resize output image to original image size, convert from BGR to RGB and save using cv2 lib
         pvc = resize(pvc, (originalsize[1], originalsize[0]), anti_aliasing=True)
         pvc=np.concatenate((np.expand_dims(pvc[...,2],-1),np.expand_dims(pvc[...,1],-1),np.expand_dims(pvc[...,0],-1)),axis=2)
         cv2.imwrite(str('output/'+hazy[n].split('/')[-1]), pvc * 255.0,[cv2.IMWRITE_JPEG_QUALITY, 100])
