@@ -11,7 +11,9 @@ import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 
 #%%
-    
+'''
+This is a standard guidedfilter process using tensorflow operations
+'''
 def t_boxFilter(img, r):
     rows, cols = img.shape[0].value, img.shape[1].value
         

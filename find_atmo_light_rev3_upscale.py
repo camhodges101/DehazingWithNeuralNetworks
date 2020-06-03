@@ -2,30 +2,19 @@ import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 import numpy as np
 from tf_guidefilter import *
-def erosionFunt(x):
-    value=x
-    wd=15
-    kernel=tf.divide((tf.ones((wd,wd,3))),tf.constant(wd*wd*3,'float'))
-    strides=[1.0,1.0,1.0,1.0]
-    rates=[1.0,1.0,1.0,1.0]
-    output=tf.nn.erosion2d(
-        value,
-        kernel,
-        strides,
-        rates,
-        padding='SAME')
-    return output
+
 
 def find_atmo_light(x):
-    #print("all image light function")
-    #x=erosionFunt(x)
+    '''
+    This is a dark channel prior method for finding global atmospheric light using tensorflow Operations. 
+    We only use the bottom 62% of the image to try and exclude bright sections of sky
+    '''
     cx=230
-    #cx=23
+    
     x=x[0,cx:620]
     r,g,b=tf.split(x,3,axis=2)
     min_dc=tf.minimum(tf.minimum(r,g),b)
-    #print(min_dc.shape)
-    #skip erode function, review later
+    
     darkvec=tf.reshape(min_dc,(1,(620-cx)*940))
     k=np.floor((620-cx)*940/1000).astype('int32')
     imvec=tf.reshape(x,((620-cx)*940,3))
